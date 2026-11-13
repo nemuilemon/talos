@@ -1,12 +1,9 @@
-use std::time::Duration;
-
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
+use crate::config::Config;
 use crate::ticker::{Tick, parse_tick};
-
-const URL: &str = "wss://stream.binance.com:9443/ws/ethusdt@ticker";
 
 // Connection state
 #[derive(Debug, Clone)]
@@ -22,11 +19,12 @@ pub enum WsEvent {
     Tick(Tick),
 }
 
-pub async fn ws_task(tx: mpsc::Sender<WsEvent>) {
+pub async fn ws_task(config: Config, tx: mpsc::Sender<WsEvent>) {
+    let url = config.ws_url();
     loop {
         let _ = tx.send(WsEvent::Status(Status::Connecting)).await;
 
-        let reason = match connect_async(URL).await {
+        let reason = match connect_async(&url).await {
             Err(e) => format!("connect failed: {e}"),
             Ok((mut ws, _response)) => {
                 let _ = tx.send(WsEvent::Status(Status::Live)).await;
@@ -69,6 +67,6 @@ pub async fn ws_task(tx: mpsc::Sender<WsEvent>) {
         {
             return;
         }
-        tokio::time::sleep(Duration::from_secs(5)).await;
+        tokio::time::sleep(config.reconnect_delay).await;
     }
 }

@@ -6,14 +6,14 @@ use futures_util::StreamExt;
 use ratatui::DefaultTerminal;
 use tokio::sync::mpsc;
 
+use crate::config::Config;
 use crate::ticker::Tick;
 use crate::ui;
 use crate::ws::{Status, WsEvent};
 
-pub const HISTORY_LEN: usize = 2000; // last 2000 ticks (the ticker stream sends about one per second)
-
 // Screen state
 pub struct App {
+    pub config: Config,
     pub status: Status,
     pub latest: Option<Tick>,
     pub prev_last: Option<f64>,
@@ -21,12 +21,13 @@ pub struct App {
 }
 
 impl App {
-    fn new() -> Self {
+    fn new(config: Config) -> Self {
         App {
             status: Status::Connecting,
             latest: None,
             prev_last: None,
-            history: VecDeque::with_capacity(HISTORY_LEN),
+            history: VecDeque::with_capacity(config.history_len),
+            config,
         }
     }
 
@@ -35,7 +36,7 @@ impl App {
             WsEvent::Status(s) => self.status = s,
             WsEvent::Tick(t) => {
                 self.prev_last = self.latest.as_ref().map(|old| old.last);
-                if self.history.len() == HISTORY_LEN {
+                if self.history.len() == self.config.history_len {
                     self.history.pop_front();
                 }
                 self.history.push_back(t.last);
@@ -48,8 +49,9 @@ impl App {
 pub async fn run(
     terminal: &mut DefaultTerminal,
     rx: &mut mpsc::Receiver<WsEvent>,
+    config: Config,
 ) -> Result<(), Box<dyn Error>> {
-    let mut app = App::new();
+    let mut app = App::new(config);
     let mut keys = EventStream::new();
 
     loop {

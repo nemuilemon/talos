@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Axis, Block, Chart, Dataset, GraphType, Paragraph},
 };
 
-use crate::app::{App, HISTORY_LEN};
+use crate::app::App;
 use crate::ws::Status;
 
 pub fn draw(frame: &mut Frame, app: &App) {
@@ -31,7 +31,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let status = match &app.status {
         Status::Connecting => "connecting…".yellow(),
         Status::Live => "live".green(),
-        Status::Reconnecting(reason) => format!("reconnecting in 5s ({reason})").red(),
+        Status::Reconnecting(reason) => format!(
+            "reconnecting in {}s ({reason})",
+            app.config.reconnect_delay.as_secs()
+        )
+        .red(),
     };
     let help = Line::from(vec![" q: quit  |  ".dark_gray(), status]);
     frame.render_widget(help, footer);
@@ -91,7 +95,7 @@ fn chart_widget<'a>(app: &App, points: &'a [(f64, f64)]) -> Chart<'a> {
 
     Chart::new(vec![dataset])
         .block(Block::bordered().title(format!(" last {} ticks ", app.history.len())))
-        .x_axis(Axis::default().bounds([0.0, HISTORY_LEN as f64]))
+        .x_axis(Axis::default().bounds([0.0, app.config.history_len as f64]))
         .y_axis(
             Axis::default()
                 .bounds([y_lo, y_hi])
